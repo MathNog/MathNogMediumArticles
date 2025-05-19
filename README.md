@@ -12,11 +12,10 @@ Each article folder includes everything needed to reproduce the results:
 - Datasets (if needed)  
 - Any supporting files or outputs
 
-## Current Topics and Articles
+## 📚 Topics
 
-├── TimeSeriesJulia/
-│   ├── StateSpaceModels - Theory
-│   └── StateSpaceModels.jl - In Practice
-│   └── ScoreDrivenModels - Theory
-│   └── ScoreDrivenModels.jl - In Practice
+### Time Series in Julia
+
+- [State Space Models – Theory](TimeSeriesJulia/01_theory-state-space-models/)
+- [State Space Models – Tutorial](TimeSeriesJulia/02_tutorial-state-space-models/)
 
