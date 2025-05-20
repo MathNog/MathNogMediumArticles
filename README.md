@@ -16,6 +16,6 @@ Each article folder includes everything needed to reproduce the results:
 
 ### Time Series in Julia
 
-- [State Space Models – Theory](TimeSeriesJulia/01_theory-state-space-models/)
-- [State Space Models – Tutorial](TimeSeriesJulia/02_tutorial-state-space-models/)
+- [State Space Models - Theory and Practice](TimeSeriesJulia/StateSpaceModels/)
+- [Score Driven Models - Theory and Practice](TimeSeriesJulia/ScoreDrivenModels/)
 
