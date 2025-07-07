@@ -109,9 +109,9 @@ Plot all the components of a time series decomposition.
 function plot_components(dates, level, slope, seasonality, type)
 
     T = length(dates)
-    p_level       = plot_component(dates[end-T+13:end], level[end-T+13:end], type, "Level")
-    p_slope       = plot_component(dates[end-T+13:end], slope[end-T+13:end], type, "Slope")
-    p_seasonality = plot_component(dates[end-T+13:end], seasonality[end-T+13:end], type, "Seasonality")
+    p_level       = plot_component(dates[end-T+14:end], level[end-T+14:end], type, "Level")
+    p_slope       = plot_component(dates[end-T+14:end], slope[end-T+14:end], type, "Slope")
+    p_seasonality = plot_component(dates[end-T+14:end], seasonality[end-T+14:end], type, "Seasonality")
 
     p_compontens = plot(p_level, p_slope, p_seasonality, layout = (3, 1), size = (900, 600))
     return p_compontens
