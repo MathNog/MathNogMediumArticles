@@ -19,4 +19,5 @@ Each article folder includes everything needed to reproduce the results, such as
 ### Time Series Packages in Julia
 
 - [StateSpaceModels.jl – Tutorial](TimeSeriesJulia/StateSpaceModels/)
+- [ScoreDrivenModels.jl – Tutorial](TimeSeriesJulia/ScoreDrivenModels/)
 
