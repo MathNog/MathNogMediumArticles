@@ -1,23 +1,27 @@
-# Medium Article Codebase
+# MathNog Medium Articles — Material Library
 
-Welcome! This repo gathers all the code and data used in the Medium articles published by myself!
+A curated library of drafts, code, data, and figures behind the Medium articles by [Matheus Nogueira](https://github.com/MathNog).
 
-My name is Matheus Nogueira, a brazilian master students in Operations Reserach from [LAMPS](https://www.lamps.ind.puc-rio.br/en/), an Optimization and Statistics Laboratory from [PUC-Rio's](https://www.puc-rio.br/english/) [Electrical](http://www.ele.puc-rio.br/) and [Industrial](https://www.ind.puc-rio.br/) engineering, whith a bachelor's degree in Computer Engineering also from PUC-Rio's [Informatics](https://www.inf.puc-rio.br/) Department.
+## Articles
 
-## 📁 Repository Structure
+### What Does It Mean to Model a Time Series?
 
-The content is organized by **topic**.  
-Each topic has its own folder (e.g., `TimeSeriesJulia/`), and inside it you'll find one folder per article.
+**Folder:** [`ModelingConcepts/WhatModelMeans/`](ModelingConcepts/WhatModelMeans/)
 
-Each article folder includes everything needed to reproduce the results, such as
-- Julia scripts and notebooks  
-- Datasets (if needed)  
-- Any supporting files or outputs
+What means to model something in a mathematical point of view? What a time series model is, why the error term matters, and how to judge a fit using the AirPassengers series and the ETS family.
 
-## 📚 Topics
+---
 
-### Time Series Packages in Julia
+### Julia for Time Series: StateSpaceModels.jl
 
-- [StateSpaceModels.jl – Tutorial](TimeSeriesJulia/StateSpaceModels/)
-- [ScoreDrivenModels.jl – Tutorial](TimeSeriesJulia/ScoreDrivenModels/)
+**Folder:** [`TimeSeriesJulia/StateSpaceModels/`](TimeSeriesJulia/StateSpaceModels/)
 
+A hands-on tutorial on forecasting with state space models using the LAMPS [StateSpaceModels.jl](https://lampspuc.github.io/StateSpaceModels.jl/latest/) package.
+
+---
+
+### Score-driven models with ScoreDrivenModels.jl
+
+**Folder:** [`TimeSeriesJulia/ScoreDrivenModels/`](TimeSeriesJulia/ScoreDrivenModels/)
+
+An introduction to GAS / score-driven models and estimation with [ScoreDrivenModels.jl](https://lampspuc.github.io/ScoreDrivenModels.jl/latest/) on Brazilian natural inflow energy data.
