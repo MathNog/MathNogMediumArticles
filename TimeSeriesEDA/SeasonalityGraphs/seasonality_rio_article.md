@@ -1,80 +1,54 @@
-# Multiple Seasonalities in Temperature: A Visual Roadmap for Rio (2015–2024)
+# Seeing Before Modelling: A Visual Guide to Multiple Seasonalities in Time Series EDA
 
-*Before fitting any model, it pays to understand what you're actually looking at — and for high-frequency series, that often means more than one seasonal pattern at once.*
+*Using ten years of Rio de Janeiro temperatures to hunt for daily, weekly, and annual patterns — one chart at a time.*
 
 ---
 
 ## Introduction
 
-There's a temptation in time series analysis to jump straight to decomposition, modelling, and forecasting. I've done it myself. The problem is that if you skip exploratory work — or do it with a single time-series plot at one resolution — you can miss entire seasonal structures that only show up when you aggregate or slice the data the right way.
+There's a temptation in time series analysis to jump straight to decomposition, modelling, and forecasting. I've done it. The problem is that if you skip the exploratory work — or rush it with a single time-series plot at one resolution — you can easily miss entire seasonal structures hiding in plain sight. As my first time series professor, Cris, once put it: for seasonal series, get the seasonal structure right and even the most naive model can surprise you.
 
-This article is a visual walkthrough of that exploration. We use ten years of 2 m air temperature in Rio de Janeiro (2015–2024, Open-Meteo ERA5 — `[LINK / CITAÇÃO]`) as a running example. Rio is instructive: the physics are clear, the signal is strong, and we have the same variable at three granularities — hourly, daily, and monthly — so we can hunt for **daily**, **weekly**, and **annual** seasonality with different tools.
+This article is a visual walkthrough of that exploration. We use ten years of 2 m air temperature in Rio de Janeiro (2015–2024, Open-Meteo ERA5 — [Historical Weather API docs](https://open-meteo.com/en/docs/historical-weather-api)) as a running example. Rio is instructive: the physics are clean, the signal is strong, and we have the same variable at three granularities — hourly, daily, and monthly — which means we can go looking for **daily**, **weekly**, and **annual** seasonality with the right tools for each.
 
-The goal is not a gallery of charts. Each figure is a different way of asking the same few questions: does temperature repeat **within the day** (across hours), **within the week** (across weekdays), and **within the year** (across months or seasons)? We stay visual throughout; formal tests and models come later.
+The goal is not a gallery of charts. Each figure is a different way of asking the same few questions: does temperature repeat **within the day** (across hours), **within the week** (across weekdays), and **within the year** (across months and seasons)? We stay visual throughout; formal tests and models come later.
 
-### Multiple seasonalities (FPP3)
+---
 
-In *Forecasting: Principles and Practice* (3rd ed.), Hyndman and Athanasopoulos describe **multiple seasonal patterns**: more than one repeating seasonal structure in the same series. That is routine in high-frequency data. Their electricity-demand example in Australia shows all three at once — lower use overnight, different weekday vs weekend behaviour, and higher demand in summer and winter. Surface temperature in Rio is a different variable, but the logic is the same: we should look for **daily**, **weekly**, and **annual** seasonality, and expect some to be strong and others absent.
+## Multiple Seasonalities: A Quick Framing
 
-One naming point matters before we go further. In the FPP sense, **daily seasonality** does *not* mean “the whole series wiggles every calendar day in the long-run plot.” It means the pattern **across hours within a day** — cool before sunrise, warm in early afternoon — that repeats day after day. That is the profile we can only see clearly when we work with hourly data or summaries by hour.
+First things first, **what is seasonality?** Let me give you two answers — one intuitive, one more precise. 
 
-The **seasonal period** \(m\) counts how many observations fit in one full repeat of a pattern. **\(m\) depends on the granularity of the series** — we are not changing the physics when we switch CSVs, only how many points fall in one seasonal period:
+Intuitively, seasonality is just a pattern that repeats on a predictable calendar rhythm: hotter summers, quieter Sundays, busier Decembers. More precisely, a time series is seasonal when it exhibits periodic fluctuations with a fixed and known period $m$ — the number of observations in one full repetition of the pattern. Both definitions point to the same idea: structure you can anticipate, if you know where to look. It is important to say that periodic pattern does not mean a deterministic pattern. The seasonal component itself can, and commonly is, stochastic - aka random - but the period $m$ must be fixed.
 
-| Seasonality | What repeats | \(m\) if the series is… |
+In *Forecasting: Principles and Practice* (3rd ed.), Hyndman and Athanasopoulos describe **multiple seasonal patterns** as the presence of more than one repeating seasonal structure in the same series — and they note it is routine in high-frequency data. Their electricity-demand example from Australia shows all three at once: lower use overnight, different weekday vs. weekend behaviour, and higher demand in summer and winter. Surface temperature in Rio is a different variable, but the logic is the same. We should look for **daily**, **weekly**, and **annual** seasonality, and we should expect some to be strong and others simply absent.
+
+One naming point matters before we go further. In FPP's sense, **daily seasonality** does *not* mean "the whole series wiggles every calendar day in the long-run plot." It means the pattern **across hours within a day** — cool before sunrise, warm in early afternoon — that repeats day after day. That is the profile you can only see clearly when you work with hourly data or hour-of-day summaries.
+
+The **seasonal period** *m* counts how many observations fit in one full repeat of a pattern. Crucially, *m* depends on the granularity of the series — we are not changing the physics when we switch between CSVs, only changing how many data points fall inside one seasonal period:
+
+| Seasonality | What repeats | *m* if the series is… |
 |-------------|--------------|---------------------------|
-| **Daily** | Pattern across **hours within a day** | Hourly: \(m = 24\) |
-| **Weekly** | Pattern across **days of the week** | Hourly: \(m = 168\) · Daily: \(m = 7\) |
-| **Annual** | Pattern across **the year** (seasons / months) | Hourly: \(m = 8766\) · Daily: \(m = 365\) · Monthly: \(m = 12\) |
-
-Hyndman, R. J., & Athanasopoulos, G. (2021). *Forecasting: principles and practice* (3rd ed.). OTexts. https://otexts.com/fpp3/ — see the treatment of multiple seasonal patterns and, for modelling, Chapter 12.
+| **Daily** | Pattern across hours within a day | Hourly: *m* = 24 |
+| **Weekly** | Pattern across days of the week | Hourly: *m* = 168 · Daily: *m* = 7 |
+| **Annual** | Pattern across the year (seasons / months) | Hourly: *m* = 8766 · Daily: *m* = 365 · Monthly: *m* = 12 |
 
 ### The dataset
 
-Three series from the same ERA5 reanalysis:
+Three series from the same ERA5 reanalysis, all measuring `temperature_2m_c`:
 
-| Series | Variable | Granularity | Role in this article | Relevant \(m\) (annual / weekly / daily) |
-|--------|----------|-------------|----------------------|------------------------------------------|
-| `temperature_rio_hourly.csv` | `temperature_2m_c` | Hourly | Heatmaps, hour boxplots, hourly profiles | 8766 / 168 / 24 |
-| `temperature_rio_daily.csv` | `temperature_2m_c` | Daily | Day-of-year overlays, weekday subseries | 365 / 7 / — |
-| `temperature_rio_monthly.csv` | `temperature_2m_c` | Monthly | Monthly boxplots, monthly overlays | 12 / — / — |
+| Series | Granularity | Role in this article |
+|--------|-------------|----------------------|
+| `temperature_rio_hourly.csv` | Hourly | Heatmaps, hour boxplots, hourly profiles |
+| `temperature_rio_daily.csv` | Daily | Day-of-year overlays, weekday subseries |
+| `temperature_rio_monthly.csv` | Monthly | Monthly boxplots, annual overlays |
 
-We move from coarse views of the full series toward plots that isolate each seasonal scale. Heatmaps show **means** in two calendar dimensions; boxplots add **spread** by hour, weekday, and calendar month; profile plots show the typical shape and how much it varies year to year or day to day.
+We move from wide views of the full series toward plots that isolate each seasonal scale. Heatmaps show **means** across two calendar dimensions; boxplots add **spread** by hour, weekday, and month; profile plots show the typical seasonal shape and how much it varies from year to year or day to day.
 
 ---
 
 ## Setup and Reproducibility
 
-The project layout:
-
-```
-SeasonalityGraphs/
-├── code/           # CSV loading, style config, plot functions, orchestrator
-├── data/           # CSVs (gitignored)
-└── imgs/           # exported figures (gitignored)
-```
-
-Dependencies:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install pandas matplotlib seaborn numpy
-```
-
-Download data from Open-Meteo ERA5:
-
-```bash
-python code/download_temperature_rio.py
-```
-
-Regenerate all 18 figures:
-
-```bash
-cd SeasonalityGraphs/code
-../.venv/bin/python run_seasonality_analysis.py
-```
-
-Figures are written to `imgs/` with the prefix `temp_rio_XX_`. All plotting logic lives in `code/seasonality_graphs.py` in the repository: `[LINK REPO]`. The heatmaps, for example, aggregate mean temperature by calendar `(hour, month)` or `(hour, weekday)`, pivot to a grid, and draw the matrix — no need to paste import boilerplate here.
+All the code and data download scripts live in the companion repository on GitHub: [SeasonalityGraphs project folder](https://github.com/MathNog/MathNogMediumArticles/tree/main/TimeSeriesEDA/SeasonalityGraphs). The README walks you through the environment setup, how to fetch the Open-Meteo ERA5 data, and how to regenerate all 18 figures in one command.
 
 ---
 
@@ -82,73 +56,67 @@ Figures are written to `imgs/` with the prefix `temp_rio_XX_`. All plotting logi
 
 The natural starting point is to plot the entire series at three granularities — hourly on top, daily in the middle, monthly at the bottom.
 
-![Fig. 04 — Hourly, daily, and monthly comparison](imgs/temp_rio_04_time_plot_granularities.png)
-*The same ten years at three levels of aggregation. The hourly panel is dense; the daily panel shows ten year-long swings; the monthly panel is a smooth seasonal skeleton.*
+![Fig. 01 — Hourly, daily, and monthly comparison](imgs/temp_rio_04_time_plot_granularities@2x.png)
+**Figure 1.** The same ten years at three levels of aggregation. The hourly panel is dense and almost unreadable; the daily panel shows ten clean warm-cool swings; the monthly panel is a smooth seasonal skeleton.
 
-**Annual seasonality** is what jumps out immediately. On the daily series (\(m = 365\)), you see ten warm–cool swings — austral summers (December–February) high, June–August low. The monthly series (\(m = 12\)) strips almost everything else away and leaves that annual pattern alone.
+**Annual seasonality** jumps out immediately. On the daily series (*m* = 365), you can count ten warm–cool swings — austral summers (December–February) high, June–August low. The monthly series (*m* = 12) strips almost everything else away and leaves that annual rhythm alone. You can see that even though the repetition is clear, the seasonal pattern is not deterministic; it is stochastic. This means that every summer is warmer then every winter, but how much warmer changes over the years.
 
-**Daily seasonality** (\(m = 24\), hourly data only) does **not** show up in this view. The top panel looks like textured noise at this zoom; you cannot read the hour-of-day profile from a decade-long hourly trace. That is the main lesson of Fig. 04: a single time-series plot at full length is tuned for **annual** structure. To investigate **daily** seasonality you need plots that explicitly aggregate by hour — heatmaps, boxplots by hour, and hourly profiles below.
+**Daily seasonality** (*m* = 24, hourly data only) does **not** show up here. The top panel looks like textured noise at this zoom; you cannot read the hour-of-day profile from a decade-long hourly trace. That is the main lesson of Fig. 01: a single time-series plot at full length is well-tuned for **annual** structure, and poorly suited for everything else. To investigate **daily** seasonality you need plots that explicitly aggregate by hour — heatmaps, boxplots by hour, and hourly profiles. Let's build those next.
 
 ---
 
 ## Two Calendar Dimensions at Once
 
-A line plot shows *when* temperature moves. A heatmap shows **two** calendar axes together: mean temperature in each cell. That is where **annual** and **daily** seasonality appear side by side on hourly data, and where an interaction between hour and month becomes visible (summer days warming more from dawn to afternoon than winter days).
+A line plot shows *when* temperature moves. A heatmap shows **two** calendar axes simultaneously: the mean temperature in each cell. On hourly data, that is where **annual** and **daily** seasonality appear side by side — and where you start to notice that their interaction is not trivial.
 
-### Hour × Month — Fig. 05
+### Hour × Month — Fig. 02
 
-![Fig. 05 — Hour × Month heatmap](imgs/temp_rio_05_heatmap_hour_x_month.png)
-*Hottest cells: late morning to early afternoon (hours 11–14) in Jan–Feb and Dec. Coolest: pre-dawn hours in July and August. Horizontal bands trace **annual** seasonality; vertical structure within a month is **daily** seasonality.*
+![Fig. 02 — Hour × Month heatmap](imgs/temp_rio_05_heatmap_hour_x_month@2x.png)
+**Figure 2.** Hottest cells: late morning to early afternoon (hours 11-14) in Jan-Feb and Dec. Coolest: pre-dawn hours in July and August. Read horizontally for annual seasonality; read vertically for the daily cycle.
 
-Read along a horizontal band (fixed hour): temperature rises and falls with the month — **annual seasonality** on hourly data (\(m = 8766\) in a full-year sense, here collapsed to month-of-year). Read up a column (fixed month): cool before sunrise, peak around noon–2 pm, cooler in the evening — **daily seasonality** (\(m = 24\)).
+Read along a horizontal band at a fixed hour: temperature rises and falls with the month — **annual seasonality** on hourly data (here collapsed to month-of-year for readability). Read up a column at a fixed month: cool before sunrise, peak around noon–2 pm, cooler in the evening — **daily seasonality** (*m* = 24).
 
-Compare January and July. In January the gap between the 6 am row and the noon row is large; in July it is smaller. The **shape of the day** is not the same in every month — hour and month are not fully separable in a simple additive model. That is worth remembering when you move to decomposition or regression later.
+Now compare January and July. In January, the gap between the 6 am row and the noon row is large; in July, it is noticeably smaller. The **shape of the daily cycle** is not the same in every month — hour and month interact in a way that a simple additive decomposition will not capture perfectly. Worth keeping in mind when you move to modelling.
 
-### Hour × Weekday — Fig. 06
+### Hour × Weekday — Fig. 03
 
-![Fig. 06 — Hour × Weekday heatmap](imgs/temp_rio_06_heatmap_hour_x_weekday.png)
-*Seven parallel columns: the same **daily** profile every day of the week.*
+![Fig. 03 — Hour × Weekday heatmap](imgs/temp_rio_06_heatmap_hour_x_weekday@2x.png)
+**Figure 3.** Seven parallel columns showing the same daily profile every day of the week. There is nothing to find here, and that is already informative.
 
-We include **weekly seasonality** (\(m = 168\) on hourly data) for completeness, but for 2 m air temperature the answer is essentially foregone: there is no physical reason Sunday should be systematically warmer than Wednesday. The atmosphere does not follow the calendar week.
-
-The heatmap matches that expectation. All seven columns show the same gradient from cool pre-dawn to warm midday at the same levels. Nothing shifts from Monday to Sunday. **Weekly seasonality is absent** for this variable — we will see the same story in the weekday boxplot, the flat weekly profile, and the weekday subseries.
+We include **weekly seasonality** (*m* = 168 on hourly data) for completeness, but the answer is essentially foregone: there is no physical reason Sunday should be systematically warmer than Wednesday. The atmosphere does not follow the calendar week. The heatmap matches that expectation — all seven columns show the same gradient from cool pre-dawn to warm midday. Nothing shifts from Monday to Sunday. **Weekly seasonality is absent**, and we will see the same flat story repeated in every subsequent plot that touches weekdays.
 
 ---
 
 ## Seasonal Levels and Spread by Calendar Feature
 
-Heatmaps show **means** only. A warm average at noon could mean every day is warm at noon, or a mix of very hot and mild days. Boxplots let us read typical **level** (median) and **spread** (IQR, whiskers) by calendar category — still in service of the same three seasonal questions, with an extra glance at whether spread itself changes by hour or month.
+Heatmaps show **means** only. A warm average at noon could mean every day is consistently warm at noon, or it could hide a mix of very hot and mild days. Boxplots let us read both the typical **level** (median) and the **spread** (IQR, whiskers) by calendar category — the same three seasonal questions, now with an extra layer of information about variability.
 
-### By Hour of Day — Fig. 07
+### By Hour of Day — Fig. 04
 
-Does **daily seasonality** show up in typical levels — and is spread wider at some hours?
+![Fig. 04 — Boxplot by hour of day](imgs/temp_rio_07_boxplot_by_hour@2x.png)
+**Figure 4.** Medians rise from ~22 C in the early hours to 26-27 C at midday, then fall. Midday boxes are also visibly wider, so afternoons are hotter and more variable.
 
-![Fig. 07 — Boxplot by hour of day](imgs/temp_rio_07_boxplot_by_hour.png)
-*Medians rise from ~22°C in the early hours to 26–27°C at midday, then fall. IQR is wider at midday than at 3–5 am.*
+**Daily seasonality** is strong and easy to read. Early-morning hours (2–6 am) have tight boxes — consistently cool. Midday hours (11–15) have wider IQRs and longer upper whiskers — not only warmer on average, but more variable from day to day. The spread is itself a feature of the daily cycle, not just the level. Remenber that those boxplots are showing the hourly distribution of the full years. One interesting extra step could be to divide this plot into 4 seasons to answer the question: does the daily variability changes across seasons? Perhaps during the summer the days are consistenly warmer. Perhaps winter temperatures changes a lot during the day.
 
-The medians trace the same story as the heatmap: **daily seasonality** is strong. Early-morning hours (2–6 am) have tight boxes — consistently cool. Midday hours (11–15) have wider IQRs and longer upper whiskers — not only warmer on average, but more variable from day to day. Afternoons are hotter *and* more spread out.
+### By Weekday — Fig. 05
 
-### By Weekday — Fig. 08
+![Fig. 05 — Boxplot by weekday](imgs/temp_rio_08_boxplot_by_weekday@2x.png)
+**Figure 5.** Seven nearly identical boxes. No weekday effect.
 
-![Fig. 08 — Boxplot by weekday](imgs/temp_rio_08_boxplot_by_weekday.png)
-*Seven overlapping boxes: same median (~23–24°C), same spread.*
+The expected null: **no weekly seasonality**. All seven days sit on top of each other. A weekday dummy in a temperature model would add nothing.
 
-Again, the expected null: no **weekly seasonality**. All seven days sit on top of each other. A weekday feature would add nothing for this series.
+### By Calendar Month — Fig. 06
 
-### By Calendar Month — Fig. 09
+![Fig. 06 — Boxplot by month](imgs/temp_rio_09_boxplot_by_month@2x.png)
+**Figure 6.** Jan-Feb highest (~26-27 C median); Jul-Aug lowest (~21 C). A ~5-6 C swing from summer peak to winter trough, with wider boxes in summer.
 
-This is **annual seasonality** viewed month by month on hourly data (twelve boxes along one year, not a separate “monthly seasonality” type).
-
-![Fig. 09 — Boxplot by month](imgs/temp_rio_09_boxplot_by_month.png)
-*Jan–Feb highest (~26–27°C median); Jul–Aug lowest (~21°C). Roughly 5–6°C from summer peak to winter trough. Wider boxes in summer.*
-
-The median steps smoothly through the year — classic southern-hemisphere **annual** pattern. Summer months have wider IQRs than mid-winter; Rio is not only hotter in summer but also more variable day to day, with more hot extremes in the upper tail. Winter months (especially May and Jun–Aug) are narrower and more predictable.
+The median steps smoothly through the year — classic southern-hemisphere **annual** pattern. Summer months have wider IQRs than mid-winter; Rio is not only hotter in summer but also more variable day to day. Winter months (especially July–August) are narrower and more predictable. That asymmetry in spread matters: it shows up later in the profile plots too.
 
 ---
 
 ## Typical Seasonal Profiles
 
-Next we plot the **average seasonal shape** for each scale and overlay many realisations (one line per year, or per day) plus a P10–P90 envelope and a red mean.
+Now we plot the **average seasonal shape** for each scale and overlay many realisations — one line per year, or per day — along with a P10–P90 envelope and a red mean line.
 
 | Layer | Meaning |
 |-------|---------|
@@ -156,79 +124,74 @@ Next we plot the **average seasonal shape** for each scale and overlay many real
 | Dashed P10/P90 | Spread across those realisations |
 | Solid red | Overall mean profile |
 
-A wide envelope means the pattern is stable in *shape* but not in *level* from one year or day to the next.
+A wide envelope means the seasonal pattern is stable in *shape* but not in *level* from one year or day to the next.
 
-### Annual Profile by Month — Fig. 10
+### Annual Profile by Month — Fig. 07
 
-![Fig. 10 — Seasonal pattern by month](imgs/temp_rio_10_seasonal_monthly_mean.png)
-*Ten grey lines (one per year): warm Jan–Feb, trough in July, recovery toward December. Tight envelope; red mean through the bundle.*
+![Fig. 07 — Seasonal pattern by month](imgs/temp_rio_10_seasonal_monthly_mean@2x.png)
+**Figure 7.** Ten lines (one per year): warm Jan-Feb, trough in July, recovery toward December. The bundle is tight in winter and slightly wider at the summer peak.
 
-Built from hourly data, aggregated to mean temperature by calendar month. This is a clean picture of **annual seasonality** (\(m = 12\) when you work at monthly resolution). The ten years are nearly parallel — same timing, similar amplitude — with a somewhat wider envelope at the summer peak than at the July trough, matching the boxplot in Fig. 09.
+Built from hourly data aggregated to mean temperature by calendar month. This is a clean picture of **annual seasonality** — *m* = 12 at monthly resolution. The ten years are nearly parallel: same timing, similar amplitude. The summer peak is where years diverge most, consistent with the boxplot in Fig. 06. Notice that the spread of the P10-P90 interval follows perfectly the spread of the boxplots in the previous figure (look at March and October for a clear comparison).
 
-### Daily, Weekly, and Annual Profiles — Fig. 15
+### Daily, Weekly, and Annual Profiles — Fig. 08
 
-![Fig. 15 — Seasonal patterns across multiple periods](imgs/temp_rio_15_seasonal_multiperiod_panel.png)
-*Top: **daily** seasonality (hour of day). Middle: **weekly** (flat). Bottom: **annual** on day-of-year from daily data.*
+![Fig. 08 — Seasonal patterns across multiple periods](imgs/temp_rio_15_seasonal_multiperiod_panel@2x.png)
+**Figure 8.** Three panels side by side: the daily pattern (strong), the weekly pattern (flat), and the annual pattern on daily data (ten overlapping years).
 
-**Top panel — daily seasonality (\(m = 24\)):** Mean temperature rises from ~22°C pre-dawn to ~26–27°C between 11 am and 2 pm, then falls. The envelope is tight at 6 am and fans out by noon (nearly 15°C between P10 and P90) — many days share the same *timing* of the peak even when they disagree on how hot the afternoon gets.
+**Top panel — daily seasonality (*m* = 24):** Mean temperature rises from ~22°C pre-dawn to ~26–27°C between 11 am and 2 pm, then falls. The envelope is tight at 6 am and fans out by noon (nearly 15°C between P10 and P90) — many days share the same *timing* of the peak even when they disagree on how hot the afternoon gets.
 
-**Middle panel — weekly seasonality:** The mean is a flat line; the envelope is two horizontal bands. No day of the week stands out. For temperature in Rio, this panel is the formal picture of what we already called obvious.
+**Middle panel — weekly seasonality:** The mean is a flat line. The envelope is two horizontal bands. No day of the week stands out. This panel is the formal version of what we already called obvious.
 
-**Bottom panel — annual seasonality (\(m = 365\) on daily data):** Ten years on the day-of-year axis share the same broad U-shape — hot at the year edges (austral summer), cool around days 190–210 (winter) — but cross more than the monthly profile in Fig. 10 because daily values are noisier. Within-year weather noise is large, so year-to-year differences are hard to separate from day-to-day variability; still, every year follows the same gross arc. Some years run hotter or cooler in particular summers or winters — weather, not a wholesale shift in the seasonal clock.
+**Bottom panel — annual seasonality (*m* = 365 on daily data):** Ten years on the day-of-year axis follow the same broad arc — hot at the year edges (austral summer), cool around days 190–210 (winter) — but they cross more than the monthly profile in Fig. 07 does, because daily values carry more within-year weather noise. Year-to-year differences become hard to separate from day-to-day variability; still, every year follows the same gross shape. Some years run hotter or cooler in particular summers or winters, but the seasonal clock stays put. If you wish to explore long term patterns, such as temperature changes over the year, maybe a high frequency data is not ideal, since it may introduce "noise" from other high frequency patterns.
 
 ---
 
 ## Does the Annual Pattern Repeat Across Years?
 
-The bottom panel of Fig. 15 already shows **annual seasonality** on daily data (\(m = 365\)). Here we zoom in with a cleaner view: one point per month, still one line per year.
+The bottom panel of Fig. 08 already shows the annual structure on daily data. Here we zoom in with a cleaner view — one point per month, one line per year — to get a sharper picture of year-to-year consistency.
 
-### Monthly Resolution — Fig. 14
+### Monthly Resolution — Fig. 09
 
-![Fig. 14 — Annual pattern, monthly resolution](imgs/temp_rio_14_seasonal_annual_monthly.png)
-*Ten years, one point per month. Same V-shape; summers spread more across years (~4°C between warmest and coolest Jan–Feb in this window).*
+![Fig. 09 — Annual pattern, monthly resolution](imgs/temp_rio_14_seasonal_annual_monthly@2x.png)
+**Figure 9.** Ten years, one point per month. Same V-shape every year; summers spread more, winters cluster tightly.
 
-With monthly aggregation (\(m = 12\)), the picture is cleaner. All ten years follow the same **annual** rhythm; winters cluster tightly, while Jan–Feb separate more (2015 notably warm early in the record, 2022 closer to the middle). Divergence is mainly in **amplitude** in summer, not in *when* the trough arrives — July or early August stays the coldest slice across years.
+With monthly aggregation (*m* = 12), the picture is clean. All ten years follow the same **annual** rhythm. Winters cluster closely; Jan–Feb separate more across years (~4°C between the warmest and coolest in this window). The divergence is mainly in **amplitude** at the summer peak — not in *when* the trough arrives. July or early August stays the coldest slice across all years.
 
 ---
 
 ## Zooming Inside Calendar Strata
 
-Subseries fix one calendar bucket (a month, or a weekday) and plot the series through time inside that bucket. They answer a practical follow-up: once we know **annual** or **weekly** structure globally, what does a single stratum look like up close?
+Subseries plots fix one calendar bucket — a month, or a weekday — and show the series through time inside that stratum. They answer a natural follow-up question: once we know the global **annual** or **weekly** structure, what does a single slice actually look like up close?
 
-### Twelve Months — Fig. 16
+### Twelve Months — Fig. 10
 
-![Fig. 16 — Monthly subseries, daily aggregates](imgs/temp_rio_16_subseries_monthly_daily.png)
-*One panel per month: daily values 2015–2024; red dashed line = mean across years in that month.*
+![Fig. 10 — Monthly subseries, daily aggregates](imgs/temp_rio_16_subseries_monthly_daily@2x.png)
+**Figure 10.** One panel per month: daily values from 2015-2024 with the cross-year mean as a red dashed line. January is clearly warmer than July.
 
-Each panel is a slice of **annual seasonality**: January's mean sits well above July's. Within a given month, points scatter around the dashed mean without a clear decade-long slope in most panels — but January (and other summer months) span a noticeable range between years.
+Each panel is a slice of **annual seasonality**: January's mean sits well above July's. Within a given month, points scatter around the dashed mean without a clear decade-long slope in most panels — but January and other summer months span a noticeable range between years. In this daily-based view, that spread is already clear: the summer months are visibly wider year to year than winter, and January varies by roughly 4°C across the 2015-2024 window. Modelling "January in Rio" as a fixed seasonal level plus noise would miss real interannual movement in the warm season.
 
-### Twelve Months, Native Monthly Series — Fig. 17
+### Seven Weekdays — Fig. 11
 
-![Fig. 17 — Monthly subseries, native monthly series](imgs/temp_rio_17_subseries_monthly_native.png)
-*One dot per year per panel — interannual spread is stark.*
+![Fig. 11 — Weekday subseries](imgs/temp_rio_18_subseries_weekday@2x.png)
+**Figure 11.** Seven panels of daily averages by weekday, with identical red means and the same annual ups and downs in every panel.
 
-At one value per year, within-month spread is unmistakable: January spans nearly 4°C between its coolest and warmest year in this window. Winter months are tighter, consistent with Fig. 09. Modelling “January in Rio” as a fixed level plus noise would ignore real year-to-year movement in the summer part of the **annual** pattern.
-
-### Seven Weekdays — Fig. 18
-
-![Fig. 18 — Weekday subseries](imgs/temp_rio_18_subseries_weekday.png)
-*Seven panels of daily averages by weekday; identical red means; the same hot–cool **annual** pattern in each.*
-
-The clearest restatement of the obvious: Monday, Wednesday, and Saturday share the same mean level and the same decade of **annual** ups and downs. **Weekly seasonality** still has nothing to add. For calendar features in a model, weekday dummies are dead weight for this variable.
+The clearest restatement of the obvious: Monday, Wednesday, and Saturday share the same mean level and the same decade of **annual** ups and downs. **Weekly seasonality** has nothing to add here. Calendar weekday dummies would be dead weight for this variable.
 
 ---
 
 ## What We Learned
 
-Rio's 2 m temperature from 2015–2024 is a textbook case of **multiple seasonalities** with unequal strength:
+Rio's 2 m temperature from 2015–2024 is a clean example of **multiple seasonalities** with very unequal strength.
 
-**Annual seasonality** dominates the narrative whenever we step back from hourly noise — roughly 5–6°C from the winter median to the summer median, stable in *timing* across years but with meaningful spread in hot months (up to ~4°C between years in Jan–Feb in Fig. 14). On daily data \(m = 365\); on monthly data \(m = 12\).
+**Annual seasonality** dominates the narrative whenever we step back from hourly noise — roughly 5–6°C from the winter median to the summer median, stable in *timing* across years but with meaningful spread in hot months (up to ~4°C between years in Jan–Feb). On daily data *m* = 365; on monthly data *m* = 12.
 
-**Daily seasonality** is equally real but **invisible on a long hourly time-series plot** (Fig. 04). It appears once we aggregate by hour: a ~4–5°C swing from pre-dawn to afternoon in the mean profile, with a wider spread at midday and a larger hour-of-day swing in summer than in winter (Figs. 05, 07, 15). On hourly data \(m = 24\).
+**Daily seasonality** is equally real but **invisible on a long hourly plot** (Fig. 01). It appears once we aggregate by hour: a ~4–5°C swing from pre-dawn to afternoon in the mean profile, with a wider envelope at midday and a larger daily amplitude in summer than in winter (Figs. 02, 04, 08). On hourly data *m* = 24.
 
-**Weekly seasonality** is absent — as we should expect for air temperature. Heatmaps, boxplots, profiles, and subseries all tell the same flat story (\(m = 168\) or \(m = 7\) would not earn a place in a model here).
+**Weekly seasonality** is absent — as physics would predict. Heatmaps, boxplots, profiles, and subseries all tell the same flat story. A *m* = 168 or *m* = 7 term would not earn a place in a model here.
 
-Spread matters too: afternoons and summer months are more variable, not just warmer. Hour and month interact slightly in the daily shape (Fig. 05). None of this replaces formal inference, but it narrows what a forecaster should plan for: at least **daily** and **annual** seasonal structure on hourly data, no **weekly** term, and interannual variation in summer levels worth modelling explicitly.
+Spread matters too: afternoons and summer months are more variable, not just warmer. Hour and month interact slightly in the daily shape (Fig. 02). None of this replaces formal inference, but it narrows what a forecaster should plan for: at least **daily** and **annual** seasonal structure on hourly data, no **weekly** term, and interannual variation in summer levels that is worth modelling explicitly.
+
+> Investigating multiple seasonalities takes multiple visualization techniques. A plain time-series plot of the full series is the one view most likely to hide high-frequency structure — and the visual noise in dense hourly data can make us overlook daily or weekly patterns altogether.
 
 ### Next steps
 
@@ -239,9 +202,9 @@ This article stays exploratory and graphical. Natural follow-ups — aligned wit
 - **Dynamic harmonic regression** (Fourier terms) or **TBATS** for multiple seasonal periods
 - Implementation in R (`fable`, `tsibble`) or Python, depending on your stack
 
-The next piece in this series can move from “we can see the structure” to “we can estimate and forecast it.”
+The next piece in this series moves from "we can see the structure" to "we can estimate and forecast it."
 
-Code and data: `[LINK REPO]` · Data: Open-Meteo ERA5 — `[LINK / CITAÇÃO]`
+Code and data: [SeasonalityGraphs project folder](https://github.com/MathNog/MathNogMediumArticles/tree/main/TimeSeriesEDA/SeasonalityGraphs) · Data: Open-Meteo ERA5 — [Historical Weather API docs](https://open-meteo.com/en/docs/historical-weather-api)
 
 ---
 

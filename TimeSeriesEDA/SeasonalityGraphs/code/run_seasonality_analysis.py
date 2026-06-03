@@ -107,7 +107,9 @@ def save_current_figure(output_dir: Path, filename: str, dpi: int) -> None:
 
 
 def figure_path(series_name: str, name: str, fmt: str) -> str:
-    return f"{series_name}_{name}.{fmt}"
+    """Article exports use @2x.png (retina-friendly naming)."""
+    _ = fmt  # kept for call-site compatibility; files are always PNG
+    return f"{series_name}_{name}@2x.png"
 
 
 def run_time_plots(
@@ -286,7 +288,7 @@ def run_seasonal_plots(
 
     plot_seasonal_intraday(
         hourly,
-        title=f"{title_base} — Intraday Pattern",
+        title=f"{title_base} — Daily Pattern (by Hour)",
         ylabel=value_label,
     )
     save_current_figure(output_dir, figure_path(series_name, f"{i:02d}_seasonal_intraday", fmt), dpi)
@@ -506,7 +508,7 @@ def main() -> None:
     total = sum(
         1
         for f in output_dir.iterdir()
-        if f.is_file() and f.name.startswith(series_name) and f.suffix == f".{fmt}"
+        if f.is_file() and f.name.startswith(series_name) and f.name.endswith("@2x.png")
     )
     log.info("═" * 60)
     log.info("Done. %d figure(s) saved to: %s", total, output_dir.resolve())

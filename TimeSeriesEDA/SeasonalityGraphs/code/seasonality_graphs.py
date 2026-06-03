@@ -39,9 +39,10 @@ from plot_style import (
     LINEWIDTH_OVERLAY,
     LINEWIDTH_SCENARIO,
     MARKER_SIZE,
+    english_date_axis,
     finalize_figure,
-    rotate_date_ticks,
     style_axes,
+    style_boxplot_y_ticks,
     style_colorbar_axis,
     style_legend,
     year_colors,
@@ -56,6 +57,13 @@ WEEKDAY_ORDER = [
     "Monday", "Tuesday", "Wednesday", "Thursday",
     "Friday", "Saturday", "Sunday",
 ]
+
+_WEEKDAY_BY_DOW = dict(enumerate(WEEKDAY_ORDER))
+
+
+def _weekday_labels(index: pd.DatetimeIndex) -> np.ndarray:
+    """English weekday names (independent of system locale)."""
+    return pd.Series(index.dayofweek, dtype=int).map(_WEEKDAY_BY_DOW).to_numpy()
 
 
 def _to_series(data, date_col="ds", value_col="y") -> pd.Series:
@@ -117,7 +125,7 @@ def plot_time_series(
     fig, ax = plt.subplots(figsize=figsize)
     ax.plot(s.index, s.values, color=color, linewidth=LINEWIDTH_MAIN)
     style_axes(ax, title=title, xlabel="Date", ylabel=ylabel)
-    rotate_date_ticks(ax)
+    english_date_axis(ax)
     finalize_figure(fig)
     plt.show()
 
@@ -144,7 +152,7 @@ def plot_series_comparison(
     style_axes(axes[1], title=title_d, xlabel="Date", ylabel=ylabel)
 
     for ax in axes:
-        rotate_date_ticks(ax)
+        english_date_axis(ax)
 
     finalize_figure(fig, suptitle="Granularity comparison")
     plt.show()
@@ -185,7 +193,7 @@ def plot_series_three_granularities(
     style_axes(axes[2], title=title_m, xlabel="Date", ylabel=ylabel)
 
     for ax in axes:
-        rotate_date_ticks(ax)
+        english_date_axis(ax)
 
     finalize_figure(fig, suptitle="Hourly, daily, and monthly comparison")
     plt.show()
@@ -206,9 +214,10 @@ def _style_boxplot(bp) -> None:
 
 
 def _draw_boxplot(ax, box_data: list, labels: list, *, title: str, xlabel: str, ylabel: str) -> None:
-    bp = ax.boxplot(box_data, labels=labels, showfliers=False, patch_artist=True)
+    bp = ax.boxplot(box_data, tick_labels=labels, showfliers=False, patch_artist=True)
     _style_boxplot(bp)
     style_axes(ax, title=title, xlabel=xlabel, ylabel=ylabel)
+    style_boxplot_y_ticks(ax)
 
 
 def plot_boxplot_by_month(
@@ -250,12 +259,13 @@ def plot_boxplot_by_hour(
     df = pd.DataFrame({"value": s.values, "hour": s.index.hour})
     order = list(range(24))
     box_data = [df.loc[df["hour"] == h, "value"].values for h in order]
-    labels = [str(h) for h in order]
+    labels = [f"{h:02d}" for h in order]
 
-    fig, ax = plt.subplots(figsize=figsize)
+    fig, ax = plt.subplots(figsize=(max(figsize[0], 14.0), figsize[1]))
     _draw_boxplot(ax, box_data, labels, title=title, xlabel="Hour of Day", ylabel=ylabel)
-    ax.set_xticks(range(0, 24, 2))
-    ax.set_xticklabels([str(h) for h in range(0, 24, 2)])
+    ax.set_xticks(range(24))
+    ax.set_xticklabels(labels, rotation=90, ha="center")
+    ax.tick_params(axis="x", labelsize=FONT_TICK - 1)
     finalize_figure(fig)
     plt.show()
 
@@ -270,7 +280,7 @@ def plot_boxplot_by_weekday(
 ):
     """Boxplot of values grouped by weekday."""
     s = _to_series(data, date_col, value_col).dropna()
-    df = pd.DataFrame({"value": s.values, "weekday": s.index.day_name()})
+    df = pd.DataFrame({"value": s.values, "weekday": _weekday_labels(s.index)})
     box_data = []
     labels = []
     for weekday in WEEKDAY_ORDER:
@@ -282,6 +292,7 @@ def plot_boxplot_by_weekday(
 
     fig, ax = plt.subplots(figsize=figsize)
     _draw_boxplot(ax, box_data, labels, title=title, xlabel="Weekday", ylabel=ylabel)
+    ax.tick_params(axis="x", rotation=0)
     finalize_figure(fig)
     plt.show()
 
@@ -399,7 +410,7 @@ def plot_heatmap_hour_weekday(
     df = pd.DataFrame({
         "value": s.values,
         "hour": s.index.hour,
-        "weekday": s.index.day_name(),
+        "weekday": _weekday_labels(s.index),
     })
     pivot = df.pivot_table(index="hour", columns="weekday", values="value", aggfunc=aggfunc)
     cols_present = [d for d in WEEKDAY_ORDER if d in pivot.columns]
@@ -483,7 +494,7 @@ def plot_seasonal_intraday(
     data,
     date_col="ds",
     value_col="y",
-    title="Intraday Pattern",
+    title="Daily Pattern (by Hour)",
     ylabel="Value",
     figsize=FIGSIZE_SEASONAL,
 ):
@@ -518,7 +529,7 @@ def plot_seasonal_weekly(
     weekday_num = {d: i for i, d in enumerate(WEEKDAY_ORDER)}
     df = pd.DataFrame({
         "value": s.values,
-        "weekday": s.index.day_name(),
+        "weekday": _weekday_labels(s.index),
         "week": s.index.to_period("W"),
     })
     df["weekday_num"] = df["weekday"].map(weekday_num)
@@ -601,7 +612,7 @@ def plot_seasonal_multiperiod(
             "date": s.index.normalize(),
         })
         _plot_seasonal_profile(ax, df_h, "hour", "value", "date", x_values=np.arange(24))
-        style_axes(ax, title="Intraday pattern", xlabel="Hour of Day", ylabel=ylabel)
+        style_axes(ax, title="Daily pattern (by hour)", xlabel="Hour of Day", ylabel=ylabel)
         ax.set_xticks(range(0, 24, 2))
         style_legend(ax, loc="best")
 
@@ -609,7 +620,7 @@ def plot_seasonal_multiperiod(
     weekday_num = {d: i for i, d in enumerate(WEEKDAY_ORDER)}
     df_d = pd.DataFrame({
         "value": s_d.values,
-        "weekday": s_d.index.day_name(),
+        "weekday": _weekday_labels(s_d.index),
         "week": s_d.index.to_period("W"),
     })
     df_d["weekday_num"] = df_d["weekday"].map(weekday_num)
@@ -718,7 +729,7 @@ def plot_seasonal_subseries_weekday(
 
     df = pd.DataFrame({
         "value": s.values,
-        "weekday": s.index.day_name(),
+        "weekday": _weekday_labels(s.index),
         "week_start": s.index.to_period("W").start_time,
     })
 

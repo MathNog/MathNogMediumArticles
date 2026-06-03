@@ -6,8 +6,10 @@ Call apply_plot_style() once before generating plots in batch.
 
 from __future__ import annotations
 
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.ticker import MaxNLocator
 
 COLORS = {
     "primary": "#1F4E79",
@@ -52,6 +54,9 @@ COLOR_SCENARIO = COLORS["hourly"]
 ALPHA_SCENARIO = 0.22
 LINEWIDTH_SCENARIO = 0.85
 SEASONAL_QUANTILES = (0.10, 0.90)
+
+# Boxplots: denser y-axis ticks; hour plot shows every hour on x
+BOX_PLOT_Y_NBINS = 10
 COLOR_QUANTILE = COLORS["primary"]
 LINEWIDTH_QUANTILE = 1.2
 LINESTYLE_QUANTILE = (0, (5, 3))
@@ -83,8 +88,16 @@ def apply_plot_style() -> None:
             "savefig.bbox": "tight",
             "savefig.facecolor": COLORS["background"],
             "legend.frameon": False,
+            "axes.formatter.use_locale": False,
         },
     )
+
+
+def style_boxplot_y_ticks(ax, *, nbins: int = BOX_PLOT_Y_NBINS) -> None:
+    """Finer temperature scale on boxplot y-axes."""
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=nbins))
+    ax.minorticks_on()
+    ax.grid(True, which="minor", linestyle=":", linewidth=0.5, alpha=0.5)
 
 
 def style_axes(
@@ -121,6 +134,14 @@ def rotate_date_ticks(ax, rotation: int = 35) -> None:
     for label in ax.get_xticklabels():
         label.set_rotation(rotation)
         label.set_ha("right")
+
+
+def english_date_axis(ax, *, max_ticks: int = 10) -> None:
+    """Date ticks with locale-independent numeric year-month labels."""
+    locator = mdates.AutoDateLocator(minticks=4, maxticks=max_ticks)
+    ax.xaxis.set_major_locator(locator)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    rotate_date_ticks(ax)
 
 
 def finalize_figure(fig, *, suptitle: str | None = None) -> None:
